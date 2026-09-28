@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Pikachu Onet Online</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background: #222; color: white; }
+        #board { display: grid; grid-template-columns: repeat(8, 60px); gap: 5px; justify-content: center; margin-top: 20px; }
+        .tile { width: 60px; height: 60px; background: #f0d060; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: bold; cursor: pointer; color: #333; }
+        .tile.empty { background: transparent; cursor: default; border: none; }
+        .selected { border: 3px solid red; background: #ffeb3b; }
+    </style>
+</head>
+<body>
+    <h1>Pikachu Onet Online</h1>
+    <input type="text" id="roomInput" placeholder="Nhập tên phòng...">
+    <button onclick="joinRoom()">Vào phòng</button>
+    <h3 id="status"></h3>
+    <div id="board"></div>
+
+    <script>
+        const socket = io();
+        let roomId = "", firstTile = null, boardData = [];
+
+        function joinRoom() {
+            roomId = document.getElementById('roomInput').value;
+            if (roomId) {
+                socket.emit('join_room', roomId);
+                document.getElementById('status').innerText = "Đã vào phòng: " + roomId;
+            }
+        }
+
+        socket.on('init_game', (data) => {
+            boardData = data.board;
+            renderBoard();
+        });
+
+        socket.on('update_board', ({ p1, p2 }) => {
+            boardData[p1.r][p1.c] = 0;
+            boardData[p2.r][p2.c] = 0;
+            renderBoard();
+        });
+
+        function renderBoard() {
+            const boardEl = document.getElementById('board');
+            boardEl.innerHTML = '';
+            for (let r = 0; r < 6; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const tile = document.createElement('div');
+                    const val = boardData[r][c];
+                    tile.className = 'tile' + (val === 0 ? ' empty' : '');
+                    tile.innerText = val !== 0 ? val : '';
+                    tile.onclick = () => selectTile(r, c, tile);
+                    boardEl.appendChild(tile);
+                }
+            }
+        }
+
+        function selectTile(r, c, el) {
+            if (boardData[r][c] === 0) return;
+            if (!firstTile) {
+                firstTile = { r, c, el };
+                el.classList.add('selected');
+            } else {
+                if (firstTile.r === r && firstTile.c === c) {
+                    firstTile.el.classList.remove('selected');
+                    firstTile = null;
+                    return;
+                }
+                // Nếu chọn 2 ô giống nhau
+                if (boardData[firstTile.r][firstTile.c] === boardData[r][c]) {
+                    socket.emit('match_tiles', { roomId, p1: { r: firstTile.r, c: firstTile.c }, p2: { r, c } });
+                }
+                firstTile.el.classList.remove('selected');
+                firstTile = null;
+            }
+        }
+    </script>
+</body>
+</html>
